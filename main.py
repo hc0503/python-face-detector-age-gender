@@ -1,4 +1,4 @@
-
+from win32api import GetSystemMetrics
 from pathlib import Path
 import cv2
 import dlib
@@ -11,6 +11,7 @@ from src.factory import get_model
 from PIL import Image, ImageQt
 import requests
 import os
+import face_recognition
 ########################
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import QStringListModel, pyqtSignal, pyqtSlot, Qt, QThread, QCoreApplication, QObject, pyqtSignal
@@ -122,9 +123,9 @@ class VideoThread(QThread):
             # detect faces using dlib detector
             detected = detector(input_img, 1)
             faces = np.empty((len(detected), img_size, img_size, 3))
-            rectangles = []
+            lst_ages = []
             cropped_faces = []
-            labels = []
+            lst_genders = []
             if len(detected) > 0:
                 for i, d in enumerate(detected):
                     x1, y1, x2, y2, w, h = d.left(), d.top(), d.right() + 1, d.bottom() + 1, d.width(), d.height()
@@ -136,7 +137,6 @@ class VideoThread(QThread):
                     cropped_faces.append(img[y1:y2, x1:x2])
                     # cv2.rectangle(img, (xw1, yw1), (xw2, yw2), (255, 0, 0), 2)
                     faces[i] = cv2.resize(img[yw1:yw2 + 1, xw1:xw2 + 1], (img_size, img_size))
-                    rectangles.append([x1, y1, x2, y2])
                 # predict ages and genders of the detected faces
                 results = model.predict(faces)
                 predicted_genders = results[0]
@@ -147,12 +147,13 @@ class VideoThread(QThread):
                     label = "{}, {}".format(int(predicted_ages[i]),
                                             "M" if predicted_genders[i][0] < 0.5 else "F")
                     self.draw_label(img, (d.left(), d.top()), label)
-                    labels.append(label)
+                    lst_ages.append(int(predicted_ages[i]))
+                    lst_genders.append("M" if predicted_genders[i][0] < 0.5 else "F")
             # cv2.imshow("result", img)
             key = cv2.waitKey(-1) if image_dir else cv2.waitKey(30)
             if key == 27:  # ESC
                 break
-            self.change_pixmap_signal.emit(img, cropped_faces, rectangles, labels)
+            self.change_pixmap_signal.emit(img, cropped_faces, lst_ages, lst_genders)
 
 class progressThread(QThread):
     progress_update = pyqtSignal(int) # or pyqtSignal(int)
@@ -185,40 +186,26 @@ class MainWindow(QWidget):
         # self.display_height = 480
         self.setWindowIcon(QtGui.QIcon('camera.jpg')) 
         self.setWindowTitle("Face Detector")
-        self.setGeometry(100, 60, 1000, 800)
+        self.setMaximumWidth(960)
+        self.setMaximumHeight(768)
+        self.setMinimumWidth(960)
+        self.setMinimumHeight(768)
+        self.setGeometry((GetSystemMetrics(0) - 960) / 2, (GetSystemMetrics(1) - 768) / 2, 960, 768)
 
         self.wdgCamera = QLabel(self)
-        cameraLayout = QGridLayout()
-        cameraLayout.addWidget(self.wdgCamera, 0, 0)
-
-        faceLayout = QGridLayout()
-        self.wdgFace1 = QLabel(self)
-        self.wdgFace1.setMaximumHeight(50)
-        self.wdgFace1.setMaximumWidth(50)
-        faceLayout.addWidget(self.wdgFace1, 0, 0)
-        self.wdgFace2 = QLabel(self)
-        self.wdgFace2.setMaximumHeight(50)
-        self.wdgFace2.setMaximumWidth(50)
-        faceLayout.addWidget(self.wdgFace2, 0, 1)
-        self.wdgFace3 = QLabel(self)
-        self.wdgFace3.setMaximumHeight(50)
-        self.wdgFace3.setMaximumWidth(50)
-        faceLayout.addWidget(self.wdgFace3, 0, 2)
-
         self.progressBar = QProgressBar(self)
         self.progressBar.setValue(0)
         self.progressBar.setTextVisible(False)
-        progressBarLayout = QGridLayout()
-        progressBarLayout.addWidget(self.progressBar, 0, 0)
 
         mainLayout = QVBoxLayout()
-        mainLayout.addLayout(progressBarLayout)
-        mainLayout.addLayout(cameraLayout)
-        mainLayout.addLayout(faceLayout)
+        mainLayout.addWidget(self.progressBar)
+        mainLayout.addWidget(self.wdgCamera)
 
         self.progress_thread = progressThread()
         self.progress_thread.start()
         self.progress_thread.progress_update.connect(self.updateProgressBar) # self.connect(self.progress_thread, SIGNAL('PROGRESS'), self.updateProgressBar)
+        
+        self.prev_img = []
 
         self.setLayout(mainLayout)
 
@@ -245,8 +232,8 @@ class MainWindow(QWidget):
                                         "Are you sure want to stop process?",
                                         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
         if close == QtWidgets.QMessageBox.Yes:
-            # event.accept()
             sys.exit()
+            event.accept()
         else:
             event.ignore()
 
@@ -254,7 +241,7 @@ class MainWindow(QWidget):
         self.thread.stop()
 
     @pyqtSlot(np.ndarray, list, list, list)
-    def update_image(self, cv_img, cropped_faces, rectangles, labels):
+    def update_image(self, cv_img, cropped_faces, ages, genders):
         """Updates the image_label with a new opencv image"""
         qt_img = self.convert_cv_qt(cv_img, self.wdgCamera.width(), self.wdgCamera.height())
         self.wdgCamera.setPixmap(qt_img)
@@ -262,22 +249,14 @@ class MainWindow(QWidget):
             i = 0
             while i < len(cropped_faces):
                 img = cropped_faces[i]
-                label = labels[i]
-                face = self.convert_cv_qt(img, self.wdgFace1.width(), self.wdgFace1.height())
-                face.save("images/" + label + ".png")
-                if i == 0:
-                    self.wdgFace1.setPixmap(face)
-                if i == 1:
-                    self.wdgFace2.setPixmap(face)
-                if i == 2:
-                    self.wdgFace3.setPixmap(face)
+                age = ages[i]
+                gender = genders[i]
 
-                test_url = "http://127.0.0.1:8084/api/savePhoto"
-                test_file = open("images/" + label + ".png", "rb")
-                test_response = requests.post(test_url, data = {"label": label}, files = {"photo": test_file})
-                test_file.close()
-                os.remove("images/" + label + ".png")
-                
+                test_url = "http://127.0.0.1:3000/uploadFace"
+                success, encoded_image = cv2.imencode('.png', img)
+                if success == True:
+                    test_file = encoded_image.tobytes()
+                    test_response = requests.post(test_url, data = {"age": age, "gender": gender}, files = {"picture": test_file})
                 i += 1
 
     def convert_cv_qt(self, cv_img, width, height):
