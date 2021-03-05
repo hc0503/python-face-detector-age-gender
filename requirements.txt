@@ -15,3 +15,5 @@ pypiwin32
 face_recognition
 opencv-contrib-python
 pyqt5
+configparser
+pyinstaller
