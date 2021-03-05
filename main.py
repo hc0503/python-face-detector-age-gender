@@ -11,17 +11,21 @@ from src.factory import get_model
 from PIL import Image, ImageQt
 import requests
 import os
-import face_recognition
 ########################
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import QStringListModel, pyqtSignal, pyqtSlot, Qt, QThread, QCoreApplication, QObject, pyqtSignal
 from PyQt5 import QtGui 
-from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtGui import QIcon, QPixmap, QFont, QFontDatabase
 from PyQt5 import QtCore
 from PyQt5 import QtWidgets
 import time
 from datetime import timedelta
 ########################
+try:
+    import configparser
+except:
+    from six.moves import configparser
+
 pretrained_model = "https://github.com/yu4u/age-gender-estimation/releases/download/v0.6/EfficientNetB3_224_weights.11-3.44.hdf5"
 modhash = '6d7f7b7ced093a8b3ef6399163da6ece'
 
@@ -184,7 +188,7 @@ class MainWindow(QWidget):
 
         # self.disply_width = 640
         # self.display_height = 480
-        self.setWindowIcon(QtGui.QIcon('camera.jpg')) 
+        self.setWindowIcon(QtGui.QIcon('camera.ico')) 
         self.setWindowTitle("Face Detector")
         self.setMaximumWidth(960)
         self.setMaximumHeight(768)
@@ -196,6 +200,9 @@ class MainWindow(QWidget):
         self.progressBar = QProgressBar(self)
         self.progressBar.setValue(0)
         self.progressBar.setTextVisible(False)
+        self.wdgCamera.setText("Please wait for a while loading camera...")
+        self.wdgCamera.setAlignment(QtCore.Qt.AlignCenter)
+        self.wdgCamera.setFont(QFont('Roboto', 20)) 
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.progressBar)
@@ -206,6 +213,10 @@ class MainWindow(QWidget):
         self.progress_thread.progress_update.connect(self.updateProgressBar) # self.connect(self.progress_thread, SIGNAL('PROGRESS'), self.updateProgressBar)
         
         self.prev_img = []
+        
+        config = configparser.ConfigParser()
+        config.readfp(open(r'server.config'))
+        self.test_url = config.get('SERVER', 'url') + '/uploadFace'
 
         self.setLayout(mainLayout)
 
@@ -252,11 +263,10 @@ class MainWindow(QWidget):
                 age = ages[i]
                 gender = genders[i]
 
-                test_url = "http://127.0.0.1:3000/uploadFace"
                 success, encoded_image = cv2.imencode('.png', img)
                 if success == True:
                     test_file = encoded_image.tobytes()
-                    test_response = requests.post(test_url, data = {"age": age, "gender": gender}, files = {"picture": test_file})
+                    test_response = requests.post(self.test_url, data = {"age": age, "gender": gender}, files = {"picture": test_file})
                 i += 1
 
     def convert_cv_qt(self, cv_img, width, height):
