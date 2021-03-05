@@ -26,6 +26,8 @@ try:
 except:
     from six.moves import configparser
 
+from configparser import SafeConfigParser
+
 pretrained_model = "https://github.com/yu4u/age-gender-estimation/releases/download/v0.6/EfficientNetB3_224_weights.11-3.44.hdf5"
 modhash = '6d7f7b7ced093a8b3ef6399163da6ece'
 
@@ -214,9 +216,9 @@ class MainWindow(QWidget):
         
         self.prev_img = []
         
-        config = configparser.ConfigParser()
-        config.readfp(open(r'server.config'))
-        self.test_url = config.get('SERVER', 'url') + '/uploadFace'
+        parser = SafeConfigParser()
+        parser.read('server.config')
+        self.test_url = parser.get('SERVER', 'url') + '/uploadFace'
 
         self.setLayout(mainLayout)
 
@@ -266,7 +268,13 @@ class MainWindow(QWidget):
                 success, encoded_image = cv2.imencode('.png', img)
                 if success == True:
                     test_file = encoded_image.tobytes()
-                    test_response = requests.post(self.test_url, data = {"age": age, "gender": gender}, files = {"picture": test_file})
+                    try:
+                        test_response = requests.post(self.test_url, data = {"age": age, "gender": gender}, files = {"picture": test_file})
+                    except requests.exceptions.RequestException as e:  # This is the correct syntax
+                        QtWidgets.QMessageBox.information(self,
+                                        "Error",
+                                        "Server connection was failed. Check server address")
+                        raise SystemExit(e)
                 i += 1
 
     def convert_cv_qt(self, cv_img, width, height):

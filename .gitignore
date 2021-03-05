@@ -32,3 +32,5 @@ pip-log.txt
 venv/
 ENV/
 /pretrained_models/
+/build/
+/dist/
