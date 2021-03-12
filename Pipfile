@@ -1,0 +1,30 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+opencv-python = "*"
+cmake = "*"
+dlib = "*"
+tensorflow = "==2.4"
+scipy = "*"
+numpy = "==1.19.2"
+pandas = "*"
+tqdm = "*"
+h5py = "==2.10.0"
+hydra-core = "*"
+scikit-learn = "*"
+albumentations = "*"
+omegaconf = "*"
+pypiwin32 = "*"
+face-recognition = "*"
+opencv-contrib-python = "*"
+pyqt5 = "*"
+configparser = "*"
+pyinstaller = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.7"
