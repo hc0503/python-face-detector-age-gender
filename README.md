@@ -3,11 +3,16 @@ This is a Keras implementation of a CNN for estimating age, gender and mask from
 
 Before run face detector app, express server should be running.
 
+## Requirements
+- Python 3.7
+- Visual studio 2019
+
 ## Installation
 ```
-$ pip install -r requirements.txt
+pipenv shell
+pipenv install
 ```
 ## Run
 ```
-$ python main.py
+python main.py
 ```
