@@ -216,9 +216,11 @@ class MainWindow(QWidget):
         
         self.prev_img = []
         
+        # Config
         parser = SafeConfigParser()
         parser.read('server.config')
         self.test_url = parser.get('SERVER', 'url') + '/uploadFace'
+        self.user_email = parser.get('SERVER', 'email')
 
         self.setLayout(mainLayout)
 
@@ -269,7 +271,7 @@ class MainWindow(QWidget):
                 if success == True:
                     test_file = encoded_image.tobytes()
                     try:
-                        test_response = requests.post(self.test_url, data = {"age": age, "gender": gender}, files = {"picture": test_file})
+                        test_response = requests.post(self.test_url, data = {"age": age, "gender": gender, 'user_email': self.user_email}, files = {"picture": test_file})
                     except requests.exceptions.RequestException as e:  # This is the correct syntax
                         QtWidgets.QMessageBox.information(self,
                                         "Error",
