@@ -34,3 +34,4 @@ ENV/
 /pretrained_models/
 /build/
 /dist/
+*.zip
